@@ -1,8 +1,57 @@
+#Modulos para directorios, manejar archivos json y ejecutar comandos
 import os
 import json
 import subprocess
+#Modulos para enviar correos
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+#Modulo fecha
+import datetime
 
-#MODULOS
+
+#FUNCIONES
+def enviaCorreo():
+    # Configuración del servidor SMTP
+    smtp_server = 'smtp.gmail.com'
+    smtp_port = 587  # Puerto para SMTP (TLS)
+
+    # Credenciales de correo electrónico
+    sender_email = 'reemplazarportucorreo@gmail.com'
+    sender_password = 'contraseña de aplicación generada en gmail'
+
+    # Destinatario y contenido del correo electrónico
+    recipient_email = 'correodestino@gmail.com'
+    subject = 'Status de Snapshots GCP'
+    body = 'Hola,\nEl proceso de snapshots para los proyectos ha sido un éxito.'
+
+    # Configurar el correo electrónico
+    message = MIMEMultipart()
+    message['From'] = sender_email
+    message['To'] = recipient_email
+    message['Subject'] = subject
+
+    # Agregar el cuerpo del mensaje
+    message.attach(MIMEText(body, 'plain'))
+
+    # Iniciar la conexión SMTP
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()  # Habilitar el cifrado TLS
+        server.login(sender_email, sender_password)
+        
+        # Enviar correo electrónico
+        server.sendmail(sender_email, recipient_email, message.as_string())
+        print('Correo electrónico enviado exitosamente.')
+        
+    except Exception as e:
+        print('Error al enviar el correo electrónico:')
+        print(e)
+        
+    finally:
+        # Cerrar la conexión SMTP
+        server.quit()
+
 def buscarLlaves():
     #Obtener la ruta de la carpeta que contiene las llaves
     rutaActual = os.getcwd() + "/key"
@@ -69,7 +118,7 @@ def listarDiscos(proyecto):
     comandoName = subprocess.run(['gcloud', 'compute', 'disks', 'list', '--project', proyecto, '--filter', 'labels.backupw=weekly OR labels.weekly-backup=yes', '--format', 'value(name)'], capture_output=True, text=True, check=True)
     
     if comandoName.returncode == 0:
-        print("Exito de comando")
+        #print("Exito de comando")
         #Dar formato al resultado del comando
         nombreDiscos = comandoName.stdout.strip().split('\n')
         
@@ -109,15 +158,29 @@ def crearSnapshots(names, zones):
     proyecto = result.stdout.strip()
     print("PROYECTO ACTUAL: ", proyecto)
 
+    #Obtener fecha actual para nomenclatura
+    fechaActualD = datetime.datetime.now()
+    anio = str(fechaActualD.year)
+    mes = str(fechaActualD.month).zfill(2)
+    dia = str(fechaActualD.day).zfill(2)
+    fechaFormato = dia + mes + anio
+
     #Variable con propósito de contador (índice)
     i = 0
     #Recorremos el arreglo de names que contiene los nombres de los discos
     for nom in names:
         #Creación de la nomenclatura para nombre de los snapshots
-        nomenclatura = f"{nom}-snapshot"
+        nomenclatura = f"snapshot-{nom}-sem-{fechaFormato}"
+        
+        #Agregar etiqueta al snapshot
+        
         
         #Comando para crear el snapshot
         subprocess.run(['gcloud', 'compute', 'disks', 'snapshot', nom, '--snapshot-names', nomenclatura, '--zone', zones[i]], check=True)
+        
+        #Agregar el log al correo
+        
+        
         print(f"Snapshot creado para el disco {nom}: {nomenclatura}")
         #Incrementamos el contador para recorrer el for
         i = i+1
@@ -167,3 +230,4 @@ if __name__ == '__main__':
                 #Incrementamos el contador para seguir recorriendo el arreglo proyectos
                 i = i+1
             print("Respaldos semanales finalizados. ")
+            enviaCorreo()
