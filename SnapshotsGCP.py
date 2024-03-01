@@ -11,24 +11,49 @@ import datetime
 
 
 #FUNCIONES
+def extraerLog():
+    contenido_extraido = ""
+    encontrado = False
+
+    #Ruta del log, es necesario crearlo anteriormente
+    with open("log.txt", "r") as archivo:
+        for linea in archivo:
+            if encontrado:
+                contenido_extraido += linea
+            elif "Proyectos y llaves validadas. Continuando con el proceso ..." in linea:
+                encontrado = True
+    return contenido_extraido
+
 def enviaCorreo():
+    contenidoLog = extraerLog()
+
+    # Obtener la fecha actual
+    fechaActual = datetime.datetime.now()
+    anio = str(fechaActual.year)
+    mes = str(fechaActual.month).zfill(2)
+    dia = str(fechaActual.day).zfill(2)
+    fechaFormato = dia + "/" + mes + "/" + anio
+    
     # Configuración del servidor SMTP
     smtp_server = 'smtp.gmail.com'
     smtp_port = 587  # Puerto para SMTP (TLS)
 
     # Credenciales de correo electrónico
-    sender_email = 'reemplazarportucorreo@gmail.com'
-    sender_password = 'contraseña de aplicación generada en gmail'
+    sender_email = 'remitente@gmail.com'
+    sender_password = 'Contraseña generada en gmail'
+
+    #Lista de distribución opcional (Multiples correos)
+    #destinatarios = ['correos']
 
     # Destinatario y contenido del correo electrónico
-    recipient_email = 'correodestino@gmail.com'
-    subject = 'Status de Snapshots GCP'
-    body = 'Hola,\nEl proceso de snapshots para los proyectos ha sido un éxito.'
+    recipient_email = 'destinatario@gmail.com'
+    subject = 'Reporte Snapshots ' + fechaFormato
+    body = contenidoLog
 
     # Configurar el correo electrónico
     message = MIMEMultipart()
     message['From'] = sender_email
-    message['To'] = recipient_email
+    message['To'] = recipient_email #', '.join(destinatarios)
     message['Subject'] = subject
 
     # Agregar el cuerpo del mensaje
@@ -42,7 +67,7 @@ def enviaCorreo():
         
         # Enviar correo electrónico
         server.sendmail(sender_email, recipient_email, message.as_string())
-        print('Correo electrónico enviado exitosamente.')
+        #print('Correo electrónico enviado exitosamente.')
         
     except Exception as e:
         print('Error al enviar el correo electrónico:')
@@ -153,10 +178,10 @@ def limpiarZonas(zonas):
 
 def crearSnapshots(names, zones):
     #Comando para obtener el proyecto actual en el que se está trabajando
-    result = subprocess.run(['gcloud', 'config', 'get-value', 'project'], capture_output=True, text=True, check=True)
+    #result = subprocess.run(['gcloud', 'config', 'get-value', 'project'], capture_output=True, text=True, check=True)
     # Obtener el valor del proyecto de la salida capturada
-    proyecto = result.stdout.strip()
-    print("PROYECTO ACTUAL: ", proyecto)
+    #proyecto = result.stdout.strip()
+    #print("PROYECTO ACTUAL: ", proyecto)
 
     #Obtener fecha actual para nomenclatura
     fechaActualD = datetime.datetime.now()
@@ -165,6 +190,9 @@ def crearSnapshots(names, zones):
     dia = str(fechaActualD.day).zfill(2)
     fechaFormato = dia + mes + anio
 
+    #Agregar etiqueta al snapshot
+    etiquetaSemanal = "backupw=weekly"
+
     #Variable con propósito de contador (índice)
     i = 0
     #Recorremos el arreglo de names que contiene los nombres de los discos
@@ -172,14 +200,8 @@ def crearSnapshots(names, zones):
         #Creación de la nomenclatura para nombre de los snapshots
         nomenclatura = f"snapshot-{nom}-sem-{fechaFormato}"
         
-        #Agregar etiqueta al snapshot
-        
-        
         #Comando para crear el snapshot
-        subprocess.run(['gcloud', 'compute', 'disks', 'snapshot', nom, '--snapshot-names', nomenclatura, '--zone', zones[i]], check=True)
-        
-        #Agregar el log al correo
-        
+        subprocess.run(['gcloud', 'compute', 'disks', 'snapshot', nom, '--labels', etiquetaSemanal, '--snapshot-names', nomenclatura, '--zone', zones[i]], check=True)    
         
         print(f"Snapshot creado para el disco {nom}: {nomenclatura}")
         #Incrementamos el contador para recorrer el for
@@ -223,11 +245,12 @@ if __name__ == '__main__':
                 
                 #Condicional IF para saber si obtuvimos datos en los arreglos anteriormente asignados
                 if nombres[0] != '' and zonas[0] != '':
-                    print("Iniciando proceso de snapshots en el proyecto ", proyectos[i], " ...")
-                    crearSnapshots(nombres, zonas)
+                    print("Proyecto ", proyectos[i], ":")
+                    #crearSnapshots(nombres, zonas)
                 else:
-                    print("El proyecto ", proyectos[i], "no tiene discos que cumplan con las etiquetas requeridas.")
+                    print("El proyecto", proyectos[i], "no tiene discos que cumplan con las etiquetas semanales requeridas.")
                 #Incrementamos el contador para seguir recorriendo el arreglo proyectos
                 i = i+1
-            print("Respaldos semanales finalizados. ")
+            #print("Respaldos semanales finalizados exitosamente. ")
+            #Agregar el log al correo
             enviaCorreo()
