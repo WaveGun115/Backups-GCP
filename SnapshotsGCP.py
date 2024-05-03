@@ -40,13 +40,13 @@ def enviaCorreo():
 
     # Credenciales de correo electrónico
     sender_email = 'remitente@gmail.com'
-    sender_password = 'Contraseña generada en gmail'
+    sender_password = 'contraseña generada en gmail'
 
     #Lista de distribución opcional (Multiples correos)
     #destinatarios = ['correos']
 
     # Destinatario y contenido del correo electrónico
-    recipient_email = 'destinatario@gmail.com'
+    recipient_email = 'destinatariop@gmail.com'
     subject = 'Reporte Snapshots ' + fechaFormato
     body = contenidoLog
 
@@ -139,16 +139,20 @@ def validarProyectos(proyectos):
 def listarDiscos(proyecto):
     arrZonasLimpias = ['']
     
-    #Comando para listar los nombres de los discos --filter="labels.backupw=weekly"
-    comandoName = subprocess.run(['gcloud', 'compute', 'disks', 'list', '--project', proyecto, '--filter', 'labels.backupw=weekly OR labels.weekly-backup=yes', '--format', 'value(name)'], capture_output=True, text=True, check=True)
+    #Etiqueta para filtrar los discos que coincidan
+    etiqueta = "labels.backupw=yes"
+    comandoName = subprocess.run(['gcloud', 'compute', 'disks', 'list', '--project', proyecto, '--filter', etiqueta, '--format', 'value(name)'], capture_output=True, text=True, check=True)
     
     if comandoName.returncode == 0:
         #print("Exito de comando")
         #Dar formato al resultado del comando
         nombreDiscos = comandoName.stdout.strip().split('\n')
+        print("Lista de discos: ")
+        for lista in nombreDiscos:
+            print(lista)
         
         #Comando para listar las zonas de los discos
-        comandoZone = subprocess.run(['gcloud', 'compute', 'disks', 'list', '--project', proyecto, '--filter', 'labels.backupw=weekly OR labels.weekly-backup=yes', '--format', 'value(zone)'], capture_output=True, text=True, check=True)
+        comandoZone = subprocess.run(['gcloud', 'compute', 'disks', 'list', '--project', proyecto, '--filter', etiqueta, '--format', 'value(zone)'], capture_output=True, text=True, check=True)
         #Dar formato al resultado del comando
         zonasDiscos = comandoZone.stdout.strip().split('\n')
         
@@ -197,11 +201,15 @@ def crearSnapshots(names, zones):
     i = 0
     #Recorremos el arreglo de names que contiene los nombres de los discos
     for nom in names:
+        #Split a variable zonas
+        location = zones[i].split("-")
+        locationSplit = location[0] + "-" + location[1]
+        
         #Creación de la nomenclatura para nombre de los snapshots
-        nomenclatura = f"snapshot-{nom}-sem-{fechaFormato}"
+        nomenclatura = f"snapshot-{nom}-semanal-{fechaFormato}"
         
         #Comando para crear el snapshot
-        subprocess.run(['gcloud', 'compute', 'disks', 'snapshot', nom, '--labels', etiquetaSemanal, '--snapshot-names', nomenclatura, '--zone', zones[i]], check=True)    
+        subprocess.run(['gcloud', 'compute', 'disks', 'snapshot', nom, '--labels', etiquetaSemanal, '--snapshot-names', nomenclatura, '--zone', zones[i], '--storage-location', locationSplit], check=True)    
         
         print(f"Snapshot creado para el disco {nom}: {nomenclatura}")
         #Incrementamos el contador para recorrer el for
@@ -240,13 +248,13 @@ if __name__ == '__main__':
                 # Ejecutar el comando 'gcloud auth activate-service-account' para autenticar con la cuenta de servicio
                 subprocess.run(['gcloud', 'auth', 'activate-service-account', '--key-file', rutaJson, '--project', proyectos[i]], check=True)
                 
-                #Función para obtener los nombrees y zonas de los discos
+                #Función para obtener los nombres y zonas de los discos
                 nombres, zonas = listarDiscos(proyectos[i])
                 
                 #Condicional IF para saber si obtuvimos datos en los arreglos anteriormente asignados
                 if nombres[0] != '' and zonas[0] != '':
                     print("Proyecto ", proyectos[i], ":")
-                    #crearSnapshots(nombres, zonas)
+                    crearSnapshots(nombres, zonas)
                 else:
                     print("El proyecto", proyectos[i], "no tiene discos que cumplan con las etiquetas semanales requeridas.")
                 #Incrementamos el contador para seguir recorriendo el arreglo proyectos
